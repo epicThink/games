@@ -1,0 +1,54 @@
+:root{
+    --column-count: 20;
+    --row-count:20;
+    --cell-size:32px;
+    text-size-adjust: 50%;
+    background-color: black;
+    color:gold;
+}
+body{
+    justify-content: middle;
+    text-align: middle;
+}
+#content{   /* stolen from https://stackoverflow.com/questions/1776915/how-can-i-center-an-absolutely-positioned-element-in-a-div*/
+    position: absolute;
+    left: 50%;
+    transform: translate(-50%,0);
+    text-align: center;
+}
+
+#start-size{
+  height:10px;
+}
+
+h2{
+  color:red;
+}
+
+#game-table {
+    display: inline-grid;
+    grid-template-columns: repeat(var(--column-count), var(--cell-size)) ;
+    grid-template-rows: repeat(var(--row-count), var(--cell-size)) ;
+    background-color: black;
+    border: double 10px gold;
+    border-radius: 10px;
+    
+  }
+  .empty-cell {
+    background-color: black;
+    text-align: center;
+  }
+  .fruit-cell{
+    background:radial-gradient(circle, rgba(255,0,0,1) 35%, rgba(255,126,0,1) 70%); 
+    text-align: center;
+    border-radius:20px;
+  }
+  .snake-cell{
+    background-color: lightgreen;
+    border:solid 1px green;
+    text-align: center;
+  }
+  .snake-head-cell{
+    background-color: green;
+    text-align: center;
+  }
