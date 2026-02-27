@@ -4,8 +4,14 @@
 // Depends on: card.js (Card class) — no game logic, no state mutation.
 
 const CARD_DURATION_MS = 500;
-const CARD_W = 65;
-const CARD_H = 130;
+
+/** Read the live rendered card size from the CSS variable so animations
+ *  match whatever size the responsive layout has computed. */
+function getCardSize() {
+  const w = parseFloat(getComputedStyle(document.documentElement)
+              .getPropertyValue("--card-w")) || 65;
+  return { w, h: w * 2 };
+}
 
 // ─────────────────────────────────────────────────────────────────
 //  CORE HELPERS
@@ -36,6 +42,7 @@ function createGhost(card, fromElOrRect) {
   }
 
   // Set ALL geometry in one shot before appending — prevents reflow artifacts
+  const { w: CARD_W, h: CARD_H } = getCardSize();
   Object.assign(ghost.style, {
     position:      "fixed",
     left:          `${rect.left}px`,
@@ -68,6 +75,7 @@ function flyGhost(ghost, toEl) {
     // (both ghost and toEl are the same card size, so this centres them)
     const fromRect = ghost.getBoundingClientRect();
     const toRect   = toEl.getBoundingClientRect();
+    const { w: CARD_W, h: CARD_H } = getCardSize();
 
     // Target the centre of toEl so the card lands in the middle of the container
     const destLeft = toRect.left + (toRect.width  - CARD_W) / 2;
