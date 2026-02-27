@@ -13,29 +13,28 @@
 function initGame() {
   const deck = shuffle(buildDeck());
 
-  const playerHand   = deck.splice(0, 5);
-  const opponentHand = deck.splice(0, 5);
-
   // First pile card must not be an Ace (would require immediate suit choice)
   let topCard;
   do { topCard = deck.splice(0, 1)[0]; } while (topCard.isWild);
 
+  // Hands start EMPTY — animateDeal() moves cards in one by one
   return {
     deck,
     pile:              [topCard],
     activeSuit:        topCard.suit,
     players: [
-      { name: "You",      hand: playerHand,   isHuman: true  },
-      { name: "Opponent", hand: opponentHand, isHuman: false },
+      { name: "You",      hand: [],  isHuman: true  },
+      { name: "Opponent", hand: [],  isHuman: false },
     ],
     currentPlayer:     0,
     pendingPunishment: 0,
-    pendingSkips:      0,      // number of stacked skips from multi-played 4s
-    pendingEffect:     null,   // "draw" | null
+    pendingSkips:      0,
+    pendingEffect:     null,
     phase:             "playing",
     winner:            null,
-    selectedCards:     [],     // UI-only: which cards the human has clicked
-    animating:         false,  // true while a card flight animation is in progress
+    selectedCards:     [],
+    animating:         false,
+    aiSkipsRemaining:  0,     // skips the AI still needs to serve (separate from human-facing pendingSkips)
   };
 }
 
@@ -153,9 +152,8 @@ function drawCard(state) {
     state.pendingPunishment = 0;
     state.pendingEffect     = null;
   } else if (state.pendingSkips > 0) {
-    // Human is accepting the skip (chose not to / couldn't counter with a 4).
-    // Clear all stacked skips and pass directly to the opponent.
-    state.pendingSkips  = 0;
+    // Human is accepting the skip — consume one skip and pass to opponent.
+    state.pendingSkips--;
     state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
     return state;
   } else {
@@ -181,18 +179,12 @@ function chooseSuit(suit, state) {
 }
 
 /**
- * Advance to the next player, honouring stacked skips.
- * Each call consumes one skip — the skipped player loses their turn and
- * control stays with the current player. Once all skips are exhausted,
- * the turn toggles normally.
+ * Advance to the next player.
+ * Always toggles currentPlayer. pendingSkips are left intact for the
+ * incoming player to either counter (play a 4) or accept (draw / timer).
  * @param {GameState} state
  */
 function advanceTurn(state) {
-  if (state.pendingSkips > 0) {
-    state.pendingSkips--;
-    // Opponent's turn is skipped; current player goes again — no toggle
-    return;
-  }
   state.currentPlayer = state.currentPlayer === 0 ? 1 : 0;
 }
 
@@ -224,8 +216,23 @@ async function aiTurn(state) {
     c.canPlayOn(topCard, state.activeSuit, state.pendingPunishment, state.pendingSkips)
   );
 
+  // If the AI has pending skips, it can only escape by counter-playing a 4.
+  // If no counter available: consume one skip, stash remaining in aiSkipsRemaining
+  // (invisible to the human — no countdown), and give human their free turn.
+  // When the human plays, maybeScheduleAI restores aiSkipsRemaining back into
+  // pendingSkips so the AI serves the next skip on its next visit.
+  if (state.pendingSkips > 0 && playable.length === 0) {
+    state.pendingSkips--;                      // consume one skip this visit
+    state.aiSkipsRemaining = state.pendingSkips; // stash the rest for later
+    state.pendingSkips = 0;                    // zero so human sees no countdown
+    advanceTurn(state);                        // toggle to human for their free turn
+    render(state);
+    maybeScheduleAI(state);
+    return;
+  }
+
   if (playable.length === 0) {
-    // AI draws — animate then mutate
+    // AI has no playable card and no pending skips — draw one normally
     const drawCount = state.pendingEffect === "draw" ? state.pendingPunishment : 1;
     state.animating = true;
     render(state);
@@ -284,15 +291,43 @@ async function aiTurn(state) {
  * AI goes again automatically.
  * @param {GameState} state
  */
+// Holds the timeout ID for the skip countdown so it can be cancelled when
+// the human acts (plays a 4 or clicks draw) before time runs out.
+let skipCountdownId = null;
+
+function clearSkipCountdown() {
+  if (skipCountdownId !== null) {
+    clearTimeout(skipCountdownId);
+    skipCountdownId = null;
+  }
+}
+
 function maybeScheduleAI(state) {
   if (state.phase !== "playing") return;
 
   if (state.currentPlayer === 1) {
+    // Restore any stashed AI skips back into pendingSkips before aiTurn runs
+    if (state.aiSkipsRemaining > 0) {
+      state.pendingSkips = state.aiSkipsRemaining;
+      state.aiSkipsRemaining = 0;
+      render(state);
+    }
     setTimeout(() => aiTurn(state), 900);
+  } else if (state.pendingSkips > 0 && state.currentPlayer === 0) {
+    // Human has pendingSkips — give them 3 seconds to counter with a 4.
+    // If the timer fires first, auto-accept the skip on their behalf.
+    clearSkipCountdown();
+    skipCountdownId = setTimeout(() => {
+      skipCountdownId = null;
+      if (state.pendingSkips > 0 && state.currentPlayer === 0 && state.phase === "playing" && !state.animating) {
+        // Auto-accept: same logic as clicking draw while a skip is pending
+        state.pendingSkips--;
+        state.currentPlayer = 1;
+        render(state);
+        setTimeout(() => aiTurn(state), 900);
+      }
+    }, 3000);
   }
-  // If currentPlayer === 0 (human's turn), do nothing — including when pendingSkips > 0.
-  // The human must either play a 4 to counter, or draw/pass to accept the skip.
-  // advanceTurn() consumes pendingSkips naturally when the human acts.
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -343,6 +378,7 @@ async function onDrawPileClick() {
   const state = gameState;
   if (state.currentPlayer !== 0 || state.phase !== "playing") return;
   if (state.animating) return;
+  clearSkipCountdown();
 
   // Peek at how many cards will be drawn before mutating state
   const drawCount = state.pendingEffect === "draw" ? state.pendingPunishment : 1;
@@ -373,6 +409,7 @@ async function onConfirmPlay() {
   if (state.selectedCards.length === 0) return;
   if (!validateMultiPlay(state.selectedCards, state)) return;
   if (state.animating) return;
+  clearSkipCountdown();
 
   // Order: anchor (directly playable) first, rest in selection order
   const topCard  = state.pile[state.pile.length - 1];
@@ -435,11 +472,17 @@ function onSuitChosen(suit) {
 }
 
 /**
- * Restart — new fresh game.
+ * Restart — new fresh game with deal animation.
  */
-function onRestartClick() {
+async function onRestartClick() {
   gameState = initGame();
+  // Render with empty hands first (animating flag suppresses interaction)
+  gameState.animating = true;
   render(gameState);
+  await animateDeal(gameState, 5);
+  gameState.animating = false;
+  render(gameState);
+  if (gameState.currentPlayer === 1) setTimeout(() => aiTurn(gameState), 900);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -455,8 +498,28 @@ document.querySelectorAll("#suit-picker button[data-suit]").forEach(btn => {
 });
 
 // ─────────────────────────────────────────────────────────────────
-//  INIT
+//  GAME START (called from main menu)
 // ─────────────────────────────────────────────────────────────────
 
-gameState = initGame();
-render(gameState);
+/**
+ * Transition from the main menu into the game:
+ * fade out menu → fade in board → deal animation → first render.
+ */
+async function startGame() {
+  await transitionMenuToGame();
+
+  gameState = initGame();
+
+  // Render board in "animating" state so cards appear but interaction is locked
+  gameState.animating = true;
+  render(gameState);
+
+  await animateDeal(gameState, 5);
+
+  gameState.animating = false;
+  render(gameState);
+
+  if (gameState.currentPlayer === 1) setTimeout(() => aiTurn(gameState), 900);
+}
+
+document.getElementById("start-btn").addEventListener("click", startGame);

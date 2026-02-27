@@ -205,11 +205,15 @@ function renderGameOver(state) {
 
   if (state.phase === "gameOver") {
     const winner = state.players[state.winner];
-    screen.style.display = "flex";
     document.getElementById("game-over-message").textContent =
       winner.isHuman ? "You win! 🎉" : "Opponent wins!";
+    // animateGameOver is defined in animate.js — fades/scales the overlay in
+    if (screen.style.display !== "flex") {
+      animateGameOver();
+    }
   } else {
     screen.style.display = "none";
+    gsap.set(screen, { clearProps: "opacity,scale" });
   }
 }
 

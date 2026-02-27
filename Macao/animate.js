@@ -1,35 +1,37 @@
 // animate.js
-// Card flight animations using fixed ghost divs + CSS translate.
-// All public functions return Promises that resolves when animation finishes.
-// Depends on: card.js (Card class) — no game logic, no state mutation.
+// Card animations powered by GSAP.
+// Public API is identical to the previous version — script.js needs no changes.
+// Depends on: card.js (Card class), GSAP loaded globally.
 
-const CARD_DURATION_MS = 500;
+const CARD_DURATION = 0.45; // seconds for a single card flight
 
-/** Read the live rendered card size from the CSS variable so animations
- *  match whatever size the responsive layout has computed. */
+// ─────────────────────────────────────────────────────────────────
+//  HELPERS
+// ─────────────────────────────────────────────────────────────────
+
+/** Read the live rendered card size from the CSS variable. */
 function getCardSize() {
-  const w = parseFloat(getComputedStyle(document.documentElement)
-              .getPropertyValue("--card-w")) || 65;
+  const w = parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue("--card-w")
+  ) || 65;
   return { w, h: w * 2 };
 }
 
-// ─────────────────────────────────────────────────────────────────
-//  CORE HELPERS
-// ─────────────────────────────────────────────────────────────────
-
 /**
- * Creates a ghost card div positioned exactly over a source position.
- * All styles are applied before the element is appended to avoid
- * mid-paint reflows that cause the top-left teleport bug.
+ * Creates a ghost card div stamped at the given position.
+ * Uses GSAP's `set` so position is applied in one synchronous pass —
+ * no reflow artifacts, no double-rAF needed.
  *
- * @param {Card|null}              card      - null → face-down grey
- * @param {HTMLElement|DOMRect}    fromElOrRect  - live element OR pre-captured rect
+ * @param {Card|null}           card         - null → face-down grey
+ * @param {HTMLElement|DOMRect} fromElOrRect - live element OR pre-captured rect
  * @returns {HTMLDivElement}
  */
 function createGhost(card, fromElOrRect) {
   const rect = (fromElOrRect instanceof Element)
     ? fromElOrRect.getBoundingClientRect()
-    : fromElOrRect;  // already a plain rect object
+    : fromElOrRect;
+
+  const { w, h } = getCardSize();
 
   const ghost = document.createElement("div");
   ghost.classList.add("card");
@@ -41,63 +43,115 @@ function createGhost(card, fromElOrRect) {
     ghost.textContent = card.label;
   }
 
-  // Set ALL geometry in one shot before appending — prevents reflow artifacts
-  const { w: CARD_W, h: CARD_H } = getCardSize();
-  Object.assign(ghost.style, {
+  document.body.appendChild(ghost);
+
+  // GSAP set: applies all styles atomically before first paint
+  gsap.set(ghost, {
     position:      "fixed",
-    left:          `${rect.left}px`,
-    top:           `${rect.top}px`,
-    width:         `${CARD_W}px`,
-    height:        `${CARD_H}px`,
-    margin:        "0",
-    zIndex:        "1000",
+    left:          rect.left,
+    top:           rect.top,
+    width:         w,
+    height:        h,
+    margin:        0,
+    zIndex:        1000,
     pointerEvents: "none",
-    // No transition yet — we add it after the first paint
-    transition:    "none",
+    x:             0,
+    y:             0,
   });
 
-  document.body.appendChild(ghost);
   return ghost;
 }
 
 /**
- * Flies `ghost` to the centre of `toEl`, then removes it.
- * Uses two rAF frames to guarantee the browser has painted the ghost
- * at its start position before the transition begins.
+ * Wraps a GSAP tween in a Promise so it can be awaited.
+ * IMPORTANT: uses .then() instead of eventCallback() so it does NOT
+ * overwrite any onComplete already set on the tween (e.g. ghost.remove()).
+ * @param {gsap.core.Tween | gsap.core.Timeline} tween
+ * @returns {Promise<void>}
+ */
+function tweenPromise(tween) {
+  return new Promise(resolve => {
+    const existing = tween.eventCallback("onComplete");
+    tween.eventCallback("onComplete", () => {
+      if (existing) existing();
+      resolve();
+    });
+  });
+}
+
+/**
+ * Compute the pixel delta from a ghost's current position to the
+ * centre of a target element.
+ */
+function getDelta(ghost, toEl) {
+  const { w, h } = getCardSize();
+  const fromRect = ghost.getBoundingClientRect();
+  const toRect   = toEl.getBoundingClientRect();
+  return {
+    dx: (toRect.left + (toRect.width  - w) / 2) - fromRect.left,
+    dy: (toRect.top  + (toRect.height - h) / 2) - fromRect.top,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  CORE FLIGHT — face-down card slides from A to B
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Slides a ghost from its current position to the centre of `toEl`.
+ * Removes the ghost on completion. Returns a Promise.
  *
  * @param {HTMLDivElement} ghost
  * @param {HTMLElement}    toEl
  * @returns {Promise<void>}
  */
 function flyGhost(ghost, toEl) {
-  return new Promise(resolve => {
-    // Compute destination: align ghost top-left to toEl's top-left
-    // (both ghost and toEl are the same card size, so this centres them)
-    const fromRect = ghost.getBoundingClientRect();
-    const toRect   = toEl.getBoundingClientRect();
-    const { w: CARD_W, h: CARD_H } = getCardSize();
-
-    // Target the centre of toEl so the card lands in the middle of the container
-    const destLeft = toRect.left + (toRect.width  - CARD_W) / 2;
-    const destTop  = toRect.top  + (toRect.height - CARD_H) / 2;
-
-    const dx = destLeft - fromRect.left;
-    const dy = destTop  - fromRect.top;
-
-    // Double rAF: first frame registers the element at rest,
-    // second frame applies the transform so CSS transition fires correctly
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        ghost.style.transition = `transform ${CARD_DURATION_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-        ghost.style.transform  = `translate(${dx}px, ${dy}px)`;
-
-        ghost.addEventListener("transitionend", () => {
-          ghost.remove();
-          resolve();
-        }, { once: true });
-      });
-    });
+  const { dx, dy } = getDelta(ghost, toEl);
+  const tween = gsap.to(ghost, {
+    x:        dx,
+    y:        dy,
+    duration: CARD_DURATION,
+    ease:     "power2.out",
+    onComplete() { ghost.remove(); },
   });
+  return tweenPromise(tween);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  PLAY ANIMATION — card flies then flips face-up on the pile
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Flies a face-up card ghost to the pile with a mid-flight Y-axis flip.
+ * First half: slides to midpoint + rotates to 90° (edge-on).
+ * Second half: swaps label (already visible since card is face-up), rotates back, slides to destination.
+ *
+ * @param {HTMLDivElement} ghost  - face-up card ghost
+ * @param {HTMLElement}    toEl   - #pile-display
+ * @returns {Promise<void>}
+ */
+function flyAndFlip(ghost, toEl) {
+  const { dx, dy } = getDelta(ghost, toEl);
+
+  return tweenPromise(
+    gsap.timeline({ onComplete() { ghost.remove(); } })
+      // First half: arc toward the pile and start rotating edge-on
+      .to(ghost, {
+        x:          dx * 0.5,
+        y:          dy * 0.5,
+        rotationY:  90,
+        duration:   CARD_DURATION * 0.45,
+        ease:       "power1.in",
+      })
+      // Second half: finish the flip and land
+      .to(ghost, {
+        x:          dx,
+        y:          dy,
+        rotationY:  0,
+        duration:   CARD_DURATION * 0.55,
+        ease:       "power1.out",
+      })
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -105,12 +159,10 @@ function flyGhost(ghost, toEl) {
 // ─────────────────────────────────────────────────────────────────
 
 /**
- * Animate drawing `count` cards one-by-one from the draw pile to the
- * player's or opponent's hand area. Sequential — each card waits for
- * the previous to land.
+ * Draw `count` cards from the draw pile to a hand area, one by one.
  *
  * @param {number}  count
- * @param {boolean} isHuman  - true → #player-hand, false → #opponent-hand
+ * @param {boolean} isHuman - true → #player-hand, false → #opponent-hand
  * @returns {Promise<void>}
  */
 async function animateDraw(count, isHuman) {
@@ -118,15 +170,14 @@ async function animateDraw(count, isHuman) {
   const targetEl = document.getElementById(isHuman ? "player-hand" : "opponent-hand");
 
   for (let i = 0; i < count; i++) {
-    const ghost = createGhost(null, sourceEl);   // face-down ghost
+    const ghost = createGhost(null, sourceEl);
     await flyGhost(ghost, targetEl);
   }
 }
 
 /**
- * Animate playing one or more cards from the human's hand to the pile.
- * Each entry carries the Card object and its pre-captured DOMRect
- * (captured before the hand re-renders, so the element is still in the DOM).
+ * Play one or more cards from the human's hand to the pile, sequentially.
+ * Each card does the flip animation.
  *
  * @param {Array<{card: Card, rect: DOMRect}>} cardRects
  * @returns {Promise<void>}
@@ -136,12 +187,12 @@ async function animatePlay(cardRects) {
 
   for (const { card, rect } of cardRects) {
     const ghost = createGhost(card, rect);
-    await flyGhost(ghost, targetEl);
+    await flyAndFlip(ghost, targetEl);
   }
 }
 
 /**
- * Animate the AI drawing cards (face-down, from draw pile to opponent hand).
+ * AI draws `count` cards (face-down) from the draw pile to the opponent hand.
  * @param {number} count
  * @returns {Promise<void>}
  */
@@ -150,7 +201,7 @@ async function animateAIDraw(count) {
 }
 
 /**
- * Animate the AI playing cards (face-down ghosts from opponent hand to pile).
+ * AI plays `count` cards (face-down ghosts) from the opponent hand to the pile.
  * @param {number} count
  * @returns {Promise<void>}
  */
@@ -162,4 +213,76 @@ async function animateAIPlay(count) {
     const ghost = createGhost(null, sourceEl);
     await flyGhost(ghost, targetEl);
   }
+}
+
+/**
+ * Opening deal animation: alternately deals cards to opponent then player,
+ * 5 each, from the draw pile.
+ *
+ * After each ghost lands, the corresponding card is moved from state.deck
+ * into the correct hand and render() is called — so the hand grows one
+ * card at a time in sync with the animation.
+ *
+ * @param {GameState} state      - mutated in place
+ * @param {number}    cardsEach  - cards per player (default 5)
+ * @returns {Promise<void>}
+ */
+async function animateDeal(state, cardsEach = 5) {
+  const sourceEl   = document.getElementById("draw-pile-card");
+  const playerEl   = document.getElementById("player-hand");
+  const opponentEl = document.getElementById("opponent-hand");
+
+  for (let i = 0; i < cardsEach * 2; i++) {
+    const isHuman    = i % 2 !== 0; // opponent first (i=0), player second (i=1), alternating
+    const playerIdx  = isHuman ? 0 : 1;
+    const targetEl   = isHuman ? playerEl : opponentEl;
+
+    const ghost = createGhost(null, sourceEl);
+    await flyGhost(ghost, targetEl);
+
+    // Move the top card from the deck into this player's hand, then re-render
+    state.players[playerIdx].hand.push(state.deck.shift());
+    render(state);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  SCENE TRANSITIONS
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Fade the main menu out, fade the game board in.
+ * @returns {Promise<void>}
+ */
+function transitionMenuToGame() {
+  return tweenPromise(
+    gsap.timeline()
+      .to("#main-menu", {
+        opacity:  0,
+        duration: 0.4,
+        ease:     "power1.in",
+        onComplete() {
+          document.getElementById("main-menu").style.display = "none";
+          document.getElementById("game-board").style.display = "flex";
+          gsap.set("#game-board", { opacity: 0 });
+        },
+      })
+      .to("#game-board", {
+        opacity:  1,
+        duration: 0.4,
+        ease:     "power1.out",
+      })
+  );
+}
+
+/**
+ * Animate the game-over overlay fading/scaling in.
+ */
+function animateGameOver() {
+  const el = document.getElementById("game-over");
+  el.style.display = "flex";
+  gsap.fromTo(el,
+    { opacity: 0, scale: 0.85 },
+    { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.4)" }
+  );
 }
