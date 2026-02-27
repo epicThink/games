@@ -5,16 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Card Game</title>
   <style>
+    /* ── CSS VARIABLES ─────────────────────────────────────
+       Card size scales with the narrowest viewport dimension.
+       On a 390px-wide phone: card ≈ 48px × 96px
+       On a 1440px desktop:   card ≈ 72px × 144px
+       clamp(min, preferred, max)
+    ──────────────────────────────────────────────────────── */
+    :root {
+      --card-w: clamp(42px, 10vmin, 72px);
+      --card-h: calc(var(--card-w) * 2);
+      --card-font: calc(var(--card-w) * 0.62);
+      --card-radius: calc(var(--card-w) * 0.15);
+      --gap-sm: clamp(4px, 1vmin, 10px);
+      --gap-md: clamp(8px, 2vmin, 20px);
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body {
+      width: 100%;
+      height: 100%;
+      /* Use dvh (dynamic viewport height) so mobile browser chrome doesn't crop */
+      min-height: 100dvh;
+    }
+
     body {
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
       background: #2d6a2d;
       display: flex;
       flex-direction: column;
       font-family: Georgia, serif;
+      overflow: hidden;
+      touch-action: manipulation; /* prevent double-tap zoom on mobile */
     }
 
     /* ── ROWS ──────────────────────────────────────────── */
@@ -26,19 +47,23 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: var(--gap-sm);
+      padding: 0 var(--gap-sm);
     }
 
     #opponent-count {
       color: #d4edda;
-      font-size: 0.85rem;
+      font-size: clamp(0.65rem, 2vmin, 0.9rem);
     }
 
     #opponent-hand {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: var(--gap-sm);
+      flex-wrap: nowrap;
+      max-width: 100%;
+      overflow: hidden; /* hide any overflow rather than push layout */
     }
 
     #play-area {
@@ -47,8 +72,9 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 50px;
+      gap: clamp(16px, 5vw, 50px);
       position: relative;
+      padding: 0 var(--gap-sm);
     }
 
     #player-row {
@@ -58,36 +84,40 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: var(--gap-sm);
+      padding: 0 var(--gap-sm);
     }
 
     #player-hand {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: var(--gap-sm);
       flex-wrap: wrap;
+      max-width: 100%;
     }
 
     /* ── CARDS ─────────────────────────────────────────── */
 
     .card {
-      width: 65px;
-      height: 130px;
+      width: var(--card-w);
+      height: var(--card-h);
       border: 2px solid black;
-      border-radius: 10px;
+      border-radius: var(--card-radius);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2rem;
+      font-size: var(--card-font);
       font-weight: 900;
-      color: white;
       user-select: none;
       flex-shrink: 0;
       transition: transform 0.15s ease, outline 0.1s ease;
+      /* Ensure text never overflows narrow cards */
+      overflow: hidden;
+      line-height: 1;
     }
 
-    .card         { background: #ffffff; }
+    .card         { background: #ffffff; color: #1c1c1c; }
     .card.red     { color: #c0392b; }
     .card.black   { color: #1c1c1c; }
     .card.hidden  { background: #7f8c8d; color: #7f8c8d; }
@@ -97,13 +127,15 @@
       cursor: pointer;
     }
 
-    .card.playable:hover {
-      transform: translateY(-10px);
+    /* Use active state for touch devices instead of hover */
+    .card.playable:hover,
+    .card.playable:active {
+      transform: translateY(calc(var(--card-h) * -0.08));
     }
 
     .card.selected {
       outline: 3px solid #00d4ff;
-      transform: translateY(-14px);
+      transform: translateY(calc(var(--card-h) * -0.11));
     }
 
     /* ── PLAY AREA ELEMENTS ────────────────────────────── */
@@ -112,49 +144,54 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: var(--gap-sm);
       color: #d4edda;
-      font-size: 0.8rem;
+      font-size: clamp(0.65rem, 2vmin, 0.85rem);
+      min-width: 0; /* allow shrink */
     }
 
-    /* Horizontal queue of up to 5 pile cards, oldest → newest (left → right) */
     #pile-display {
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 8px;
+      gap: var(--gap-sm);
     }
 
     #draw-pile-card {
       cursor: pointer;
     }
 
-    #draw-pile-card:hover {
+    #draw-pile-card:hover,
+    #draw-pile-card:active {
       outline: 2px solid white;
     }
 
     #active-suit-indicator {
       position: absolute;
-      bottom: 10px;
-      font-size: 1.1rem;
+      bottom: clamp(6px, 1.5vmin, 12px);
+      font-size: clamp(0.75rem, 2.5vmin, 1.1rem);
       font-weight: bold;
       background: rgba(0,0,0,0.45);
-      padding: 4px 14px;
+      padding: 3px 12px;
       border-radius: 20px;
       display: none;
       color: white;
+      white-space: nowrap;
     }
 
     #punishment-banner {
       position: absolute;
-      bottom: 10px;
+      bottom: clamp(6px, 1.5vmin, 12px);
       background: #c0392b;
       color: white;
-      padding: 4px 16px;
+      padding: 3px 12px;
       border-radius: 20px;
-      font-size: 0.9rem;
+      font-size: clamp(0.7rem, 2.2vmin, 0.9rem);
       font-weight: bold;
       display: none;
+      white-space: nowrap;
+      max-width: 90%;
+      text-align: center;
     }
 
     /* ── STATUS BAR ────────────────────────────────────── */
@@ -166,30 +203,49 @@
       transform: translateX(-50%);
       background: rgba(0,0,0,0.5);
       color: white;
-      padding: 4px 20px;
+      padding: 3px 16px;
       border-radius: 20px;
-      font-size: 0.85rem;
+      font-size: clamp(0.65rem, 2vmin, 0.85rem);
       pointer-events: none;
       white-space: nowrap;
       z-index: 5;
+      max-width: 90vw;
+      text-align: center;
     }
 
     /* ── CONFIRM BUTTON ────────────────────────────────── */
 
+    #confirm-play-wrapper {
+      width: 100%;
+      height: 0;           /* takes no space in the flow */
+      position: relative;
+      z-index: 6;
+      display: flex;
+      justify-content: center;
+    }
+
     #confirm-play {
       display: none;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
       background: #f39c12;
       border: none;
       border-radius: 8px;
       color: white;
-      font-size: 0.9rem;
+      font-size: clamp(0.75rem, 2.5vmin, 0.95rem);
       font-weight: bold;
-      padding: 6px 20px;
+      padding: clamp(5px, 1.5vmin, 8px) clamp(12px, 3vmin, 22px);
       cursor: pointer;
       font-family: Georgia, serif;
+      min-height: 36px;
+      min-width: 80px;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
 
-    #confirm-play:hover { background: #e67e22; }
+    #confirm-play:hover,
+    #confirm-play:active { background: #e67e22; }
 
     /* ── SUIT PICKER OVERLAY ───────────────────────────── */
 
@@ -201,39 +257,42 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 20px;
+      gap: var(--gap-md);
       z-index: 10;
     }
 
     #suit-picker h2 {
       color: white;
-      font-size: 1.2rem;
+      font-size: clamp(0.9rem, 3vmin, 1.3rem);
     }
 
     #suit-picker-buttons {
       display: flex;
-      gap: 16px;
+      gap: var(--gap-md);
     }
 
     #suit-picker button {
-      width: 65px;
-      height: 130px;
+      width: var(--card-w);
+      height: var(--card-h);
       border: 2px solid black;
-      border-radius: 10px;
-      font-size: 2.2rem;
+      border-radius: var(--card-radius);
+      font-size: var(--card-font);
       cursor: pointer;
       font-weight: 900;
-      color: white;
       transition: outline 0.1s ease;
+      background: #ffffff;
+      /* Accessible tap target */
+      min-width: 44px;
+      min-height: 44px;
     }
 
-    #suit-picker button { background: #ffffff; }
     #suit-picker button[data-suit="hearts"],
     #suit-picker button[data-suit="diamonds"] { color: #c0392b; }
     #suit-picker button[data-suit="clubs"],
     #suit-picker button[data-suit="spades"]   { color: #1c1c1c; }
 
-    #suit-picker button:hover { outline: 3px solid gold; }
+    #suit-picker button:hover,
+    #suit-picker button:active { outline: 3px solid gold; }
 
     /* ── GAME OVER SCREEN ──────────────────────────────── */
 
@@ -245,14 +304,16 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 20px;
+      gap: var(--gap-md);
       z-index: 20;
     }
 
     #game-over-message {
       color: gold;
-      font-size: 2.5rem;
+      font-size: clamp(1.5rem, 6vmin, 2.5rem);
       font-weight: bold;
+      text-align: center;
+      padding: 0 1rem;
     }
 
     #restart-btn {
@@ -260,14 +321,16 @@
       border: none;
       border-radius: 8px;
       color: white;
-      font-size: 1rem;
+      font-size: clamp(0.85rem, 2.5vmin, 1rem);
       font-weight: bold;
-      padding: 10px 30px;
+      padding: clamp(8px, 2vmin, 12px) clamp(20px, 5vmin, 32px);
       cursor: pointer;
       font-family: Georgia, serif;
+      min-height: 44px;
     }
 
-    #restart-btn:hover { background: #2ecc71; }
+    #restart-btn:hover,
+    #restart-btn:active { background: #2ecc71; }
   </style>
 </head>
 <body>
@@ -295,10 +358,14 @@
     <span id="punishment-banner"></span>
   </div>
 
+  <!-- ── CONFIRM PLAY (sits between play area and hand) ── -->
+  <div id="confirm-play-wrapper">
+    <button id="confirm-play"></button>
+  </div>
+
   <!-- ── BOTTOM ROW: Player ──────────────────────────── -->
   <div id="player-row">
     <div id="player-hand"></div>
-    <button id="confirm-play"></button>
   </div>
 
   <!-- ── STATUS BAR ──────────────────────────────────── -->
@@ -322,13 +389,9 @@
   </div>
 
   <!-- ── SCRIPTS: order matters ──────────────────────── -->
-  <!-- 1. Card class + deck helpers (no DOM dependency)  -->
   <script src="card.js"></script>
-  <!-- 2. Pure rendering functions (uses Card, touches DOM) -->
   <script src="render.js"></script>
-  <!-- 3. Card animation helpers (uses Card, reads DOM) -->
   <script src="animate.js"></script>
-  <!-- 4. Game logic, AI, event handlers, init (uses all above) -->
   <script src="script.js"></script>
 
 </body>
