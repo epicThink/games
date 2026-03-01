@@ -36,30 +36,40 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: clamp(16px, 4vmin, 32px);
-      padding: clamp(20px, 6vw, 60px);
+      /* Scrollable on short screens; centred when content fits */
+      justify-content: safe center;
+      overflow-y: auto;
+      gap: clamp(10px, 3vmin, 28px);
+      padding: clamp(16px, 4vw, 48px) clamp(16px, 5vw, 48px);
       z-index: 100;
     }
 
     #main-menu h1 {
       color: gold;
-      font-size: clamp(1.8rem, 7vmin, 3.5rem);
+      /* Tighter clamp so title never clips on narrow/short phones */
+      font-size: clamp(1.4rem, 6vmin, 3.2rem);
       font-weight: 900;
       letter-spacing: 0.05em;
       text-align: center;
+      flex-shrink: 0;
     }
 
     #main-menu .rules {
       color: #f0c040;
-      font-size: clamp(0.75rem, 2.2vmin, 1rem);
+      /* Font shrinks more aggressively on small screens */
+      font-size: clamp(0.7rem, 2vmin, 1rem);
+      width: 100%;
       max-width: 600px;
-      line-height: 1.75;
+      line-height: 1.65;
       text-align: left;
       border: 1px solid #444;
       border-radius: 10px;
-      padding: clamp(12px, 3vmin, 24px) clamp(16px, 4vmin, 32px);
+      padding: clamp(10px, 2.5vmin, 22px) clamp(12px, 3.5vmin, 28px);
       background: rgba(255,255,255,0.04);
+      /* Allow the box to shrink on very small screens */
+      flex-shrink: 1;
+      min-height: 0;
+      overflow-y: auto;
     }
 
     #main-menu .rules strong {
@@ -72,12 +82,13 @@
       border: none;
       border-radius: 8px;
       font-family: Georgia, serif;
-      font-size: clamp(0.9rem, 3vmin, 1.2rem);
+      font-size: clamp(0.85rem, 2.8vmin, 1.15rem);
       font-weight: 900;
-      padding: clamp(10px, 2.5vmin, 16px) clamp(32px, 8vmin, 64px);
+      padding: clamp(8px, 2vmin, 14px) clamp(28px, 7vmin, 56px);
       cursor: pointer;
       letter-spacing: 0.06em;
-      min-height: 48px;
+      min-height: 44px;
+      flex-shrink: 0;
       transition: background 0.15s ease, transform 0.1s ease;
     }
 
@@ -391,7 +402,7 @@
        MAIN MENU
   ══════════════════════════════════════════════════════ -->
   <div id="main-menu">
-    <h1>♠ Card Game ♥</h1>
+    <h1>♠ Macao ♥</h1>
 
     <div class="rules">
       <strong>Goal:</strong> Be the first to empty your hand.<br><br>
