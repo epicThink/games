@@ -1,0 +1,14 @@
+{
+  "name": "egyptian-war",
+  "version": "1.0.0",
+  "description": "Egyptian War (Razboi Egiptean) - local multiplayer slap card game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

@@ -1,0 +1,424 @@
+:root {
+  --felt: #1d5c3a;
+  --felt-dark: #14402a;
+  --ink: #f2efe7;
+  --blue: #29abe2;
+  --blue-dark: #1580ad;
+  --red: #c0392b;
+  --gold: #f1c40f;
+  --card-w: 130px;
+  --card-h: 188px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: radial-gradient(ellipse at 50% 35%, var(--felt) 0%, var(--felt-dark) 80%);
+  color: var(--ink);
+  overflow: hidden;
+  user-select: none;
+}
+
+.screen { display: none; height: 100vh; }
+
+/* ---------- LOBBY ---------- */
+#lobby {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+#lobby h1, #over h1 {
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-size: 56px;
+  letter-spacing: 2px;
+  text-shadow: 3px 3px 0 rgba(0,0,0,.35);
+}
+.subtitle { opacity: .75; font-size: 17px; margin-bottom: 12px; }
+
+.lobby-box {
+  background: rgba(0,0,0,.28);
+  border: 2px solid rgba(255,255,255,.15);
+  border-radius: 18px;
+  padding: 26px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 340px;
+}
+#playerList { list-style: none; width: 100%; }
+#playerList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  padding: 8px 6px;
+  border-bottom: 1px dashed rgba(255,255,255,.18);
+}
+#playerList li .dot {
+  width: 26px; height: 18px;
+  background: var(--blue);
+  border: 2px solid #000;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#playerList li .tag {
+  font-size: 12px;
+  background: var(--gold);
+  color: #222;
+  border-radius: 8px;
+  padding: 1px 8px;
+  font-weight: 700;
+}
+#playerList li .you { background: var(--blue); color: #fff; }
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.name-row input {
+  width: 220px;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink);
+  background: rgba(0,0,0,.25);
+  border: 3px solid #000;
+  border-radius: 14px;
+  outline: none;
+}
+.name-row input:focus { border-color: var(--blue); }
+.name-row input::placeholder { color: rgba(242,239,231,.55); }
+#renameBtn {
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-size: 15px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 3px solid #fff;
+  background: var(--blue-dark);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .12s;
+  white-space: nowrap;
+}
+#renameBtn:hover { transform: scale(1.05); }
+
+#joinBtn {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  font-size: 40px;
+  line-height: 1;
+  border: 3px solid #fff;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .12s;
+}
+#joinBtn:hover { transform: scale(1.1); }
+#joinBtn:disabled { opacity: .35; cursor: default; transform: none; }
+
+#startBtn, #againBtn {
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-size: 22px;
+  padding: 10px 34px;
+  border-radius: 12px;
+  border: 3px solid #fff;
+  background: var(--red);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .12s;
+}
+#startBtn:hover:not(:disabled), #againBtn:hover { transform: scale(1.05); }
+#startBtn:disabled { opacity: .4; cursor: default; }
+#lobbyHint, #overHint { font-size: 14px; opacity: .7; }
+
+/* ---------- GAME ---------- */
+#game { position: relative; }
+
+#status {
+  position: absolute;
+  top: 14px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 19px;
+  background: rgba(0,0,0,.35);
+  padding: 8px 22px;
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 5;
+}
+#status .hot { color: var(--gold); font-weight: 700; }
+
+/* opponents */
+.opp {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  transform: translate(-50%, -50%);
+  transition: opacity .3s;
+  z-index: 4;
+}
+.opp .oval {
+  width: 74px; height: 52px;
+  background: var(--blue);
+  border: 3px solid #000;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: #06283a;
+  box-shadow: 0 4px 10px rgba(0,0,0,.4);
+}
+.opp .oname { font-size: 14px; background: rgba(0,0,0,.35); padding: 2px 10px; border-radius: 8px; }
+.opp .osub { font-size: 11px; opacity: .85; }
+.opp.turn .oval { outline: 4px solid var(--gold); animation: pulse 1.1s infinite; }
+.opp.out .oval { background: #888; }
+.opp.locked { opacity: .35; }
+.opp.locked .oval { background: #444; color: #999; }
+@keyframes pulse {
+  0%, 100% { outline-offset: 0; }
+  50% { outline-offset: 5px; }
+}
+
+/* pile */
+#pileArea {
+  position: absolute;
+  top: 44%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(var(--card-w) + 70px);
+  height: calc(var(--card-h) + 50px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#pile {
+  position: relative;
+  width: var(--card-w);
+  height: var(--card-h);
+  cursor: pointer;
+}
+#pile.empty {
+  border: 3px dashed rgba(255,255,255,.35);
+  border-radius: 12px;
+}
+#pile.challenge { filter: drop-shadow(0 0 18px var(--gold)); }
+#pile.droptarget { filter: drop-shadow(0 0 18px #7df) drop-shadow(0 0 4px #7df); }
+
+.pcard {
+  position: absolute;
+  inset: 0;
+  background: #fdfcf7;
+  border: 2px solid #1b1b1b;
+  border-radius: 12px;
+  box-shadow: 0 6px 14px rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pcard .corner {
+  position: absolute;
+  top: 7px; left: 9px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+.pcard .corner.br { top: auto; left: auto; bottom: 7px; right: 9px; transform: rotate(180deg); }
+.pcard .big { font-size: 64px; }
+.pcard.red { color: #c22; }
+.pcard.black { color: #111; }
+.pcard.pop { animation: pop .22s ease-out; }
+@keyframes pop {
+  from { transform: scale(1.25) translateY(-26px); opacity: .4; }
+  to   { transform: none; opacity: 1; }
+}
+
+#pileCount {
+  position: absolute;
+  bottom: -28px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 15px;
+  opacity: .85;
+  white-space: nowrap;
+}
+#challengePips {
+  position: absolute;
+  top: -26px; left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 7px;
+}
+#challengePips .pip {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 2px solid #000;
+}
+#challengePips .pip.used { background: transparent; border-color: rgba(255,255,255,.4); }
+
+#pileFlash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px;
+  pointer-events: none;
+  z-index: 9;
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-weight: 800;
+  text-shadow: 0 0 14px rgba(0,0,0,.6);
+}
+
+/* hand-written hints */
+#slapHint, #dragHint {
+  position: absolute;
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+  opacity: .9;
+  pointer-events: none;
+}
+#slapHint { left: 6%; bottom: 28%; }
+#dragHint {
+  right: 13%; bottom: 22%;
+  display: none;
+  animation: nudge 1.2s infinite;
+}
+#dragHint svg { display: block; margin: 4px auto 0; }
+@keyframes nudge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* my deck */
+#deckArea {
+  position: absolute;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 6;
+}
+#myDeck {
+  width: calc(var(--card-w) * .85);
+  height: calc(var(--card-h) * .85);
+  position: relative;
+  touch-action: none;
+}
+#myDeck.myturn { cursor: grab; filter: drop-shadow(0 0 16px var(--gold)); }
+#myDeck.myturn:active { cursor: grabbing; }
+#myDeck.empty .cardback { opacity: .18; }
+
+.cardback {
+  position: absolute;
+  inset: 0;
+  border: 4px solid #000;
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(135deg,
+      var(--blue) 0 16px,
+      #0e0e0e 16px 22px);
+  box-shadow: inset 0 0 0 5px var(--blue), 0 6px 14px rgba(0,0,0,.45);
+}
+#deckLabel { color: var(--blue); font-weight: 700; font-size: 15px; text-shadow: 1px 1px 0 #000; }
+#myStatus { font-size: 14px; color: var(--gold); font-weight: 700; min-height: 18px; }
+
+#dragGhost {
+  position: fixed;
+  width: calc(var(--card-w) * .85);
+  height: calc(var(--card-h) * .85);
+  pointer-events: none;
+  z-index: 50;
+  display: none;
+  transform: translate(-50%, -50%) rotate(-4deg);
+}
+
+/* log + toasts */
+#log {
+  position: absolute;
+  left: 12px; bottom: 12px;
+  width: 240px;
+  font-size: 12px;
+  opacity: .8;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 5;
+}
+#log div { background: rgba(0,0,0,.3); border-radius: 7px; padding: 3px 9px; }
+
+#toasts {
+  position: fixed;
+  bottom: 18px; right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 60;
+}
+.toast {
+  background: #222;
+  border-left: 5px solid var(--blue);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  animation: toastIn .25s ease-out;
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+}
+.toast.bad { border-left-color: var(--red); }
+.toast.good { border-left-color: var(--gold); }
+@keyframes toastIn { from { transform: translateX(40px); opacity: 0; } }
+
+#spectator {
+  position: absolute;
+  top: 60px; left: 14px;
+  background: rgba(0,0,0,.5);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  display: none;
+  z-index: 7;
+}
+
+/* effects */
+#game.shake { animation: shake .35s; }
+@keyframes shake {
+  0%, 100% { transform: translate(0,0); }
+  20% { transform: translate(-9px, 4px); }
+  40% { transform: translate(8px, -5px); }
+  60% { transform: translate(-6px, -3px); }
+  80% { transform: translate(5px, 4px); }
+}
+
+#over {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* narrow windows (side-by-side browser instances) */
+@media (max-width: 900px) {
+  :root { --card-w: 96px; --card-h: 139px; }
+  #status { font-size: 13px; top: 8px; max-width: 92%; white-space: normal; text-align: center; }
+  #slapHint, #dragHint { font-size: 18px; }
+  #slapHint { bottom: 34%; left: 3%; }
+  #dragHint { right: 6%; }
+  #log { width: 170px; font-size: 10px; }
+  .opp .oval { width: 58px; height: 42px; font-size: 17px; }
+  .opp .oname { font-size: 11px; }
+  #lobby h1, #over h1 { font-size: 38px; }
+}

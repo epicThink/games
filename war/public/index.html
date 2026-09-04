@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Egyptian War</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- LOBBY -->
+  <div id="lobby" class="screen">
+    <h1>Egyptian War</h1>
+    <p class="subtitle">Război Egiptean &mdash; slap fast, win everything</p>
+    <div class="lobby-box">
+      <ul id="playerList"></ul>
+      <div class="name-row" id="joinRow">
+        <input id="nameInput" maxlength="16" autocomplete="off" placeholder="enter your name here" />
+        <button id="joinBtn" title="Join the lobby">+</button>
+      </div>
+      <div class="name-row" id="renameRow">
+        <input id="renameInput" maxlength="16" autocomplete="off" placeholder="new name" />
+        <button id="renameBtn">Change name:</button>
+      </div>
+      <p id="lobbyHint"></p>
+      <button id="startBtn">START GAME</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="screen">
+    <div id="status"></div>
+    <div id="opponents"></div>
+
+    <div id="pileArea">
+      <div id="pile" title="Click to slap!"></div>
+      <div id="challengePips"></div>
+      <div id="pileCount"></div>
+      <div id="pileFlash"></div>
+    </div>
+
+    <div id="slapHint">TAP SPACE<br>TO &bdquo;SLAP&rdquo;</div>
+    <div id="dragHint">DRAG<br>TO PLACE
+      <svg viewBox="0 0 60 80" width="48" height="64"><path d="M30 70 C 38 45, 30 30, 18 14" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M10 26 L18 10 L30 18" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+
+    <div id="deckArea">
+      <div id="myDeck">
+        <div class="cardback"></div>
+      </div>
+      <div id="deckLabel"><span id="deckCount">0</span> cards in ur deck</div>
+      <div id="myStatus"></div>
+    </div>
+
+    <div id="log"></div>
+    <div id="spectator">SPECTATING &mdash; game in progress</div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="over" class="screen">
+    <h1 id="winnerText"></h1>
+    <p class="subtitle">holds all 52 cards</p>
+    <button id="againBtn">PLAY AGAIN</button>
+    <p id="overHint"></p>
+  </div>
+
+  <div id="toasts"></div>
+  <div id="dragGhost"><div class="cardback"></div></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
